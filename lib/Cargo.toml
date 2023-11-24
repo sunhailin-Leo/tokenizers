@@ -7,10 +7,8 @@ edition = "2021"
 crate-type = ["staticlib"]
 
 [dependencies]
-libc = "0.2.147"
-# not a direct dependency, but necessary for cross compilation
-openssl = { version = "0.10.50", features = ["vendored"] }
-tokenizers = "0.14.0"
+libc = "0.2.140"
+tokenizers = {version = "0.14.1" }
 
 [registries.crates-io]
 # speed up "Updating crates.io index"

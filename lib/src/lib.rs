@@ -96,18 +96,20 @@ pub unsafe extern "C" fn from_file(config: *const libc::c_char) -> *mut libc::c_
 fn encode_process(encoding: Encoding, options: &EncodeOptions) -> Buffer {
     // ids, tokens
     let mut vec_ids = encoding.get_ids().to_vec();
+    vec_ids.shrink_to_fit();
+    let ids = vec_ids.as_mut_ptr();
+    let len = vec_ids.len();
+    std::mem::forget(vec_ids);
+
+    // tokens
     let mut vec_tokens = encoding
         .get_tokens()
         .iter()
         .cloned()
         .map(|s| std::ffi::CString::new(s).unwrap().into_raw())
         .collect::<Vec<_>>();
-    vec_ids.shrink_to_fit();
     vec_tokens.shrink_to_fit();
-    let ids = vec_ids.as_mut_ptr();
     let tokens = vec_tokens.as_mut_ptr();
-    let len = vec_ids.len();
-    std::mem::forget(vec_ids);
     std::mem::forget(vec_tokens);
 
     // type_ids
@@ -181,15 +183,26 @@ pub unsafe extern "C" fn encode(
             .expect("failed to cast tokenizer");
     }
     let message_cstr = unsafe { CStr::from_ptr(message) };
-    let message = message_cstr.to_str().unwrap();
+    let message = message_cstr.to_str();
+    if message.is_err() {
+        return Buffer {
+            ids: null_mut(),
+            type_ids: null_mut(),
+            special_tokens_mask: null_mut(),
+            attention_mask: null_mut(),
+            tokens: null_mut(),
+            offsets: null_mut(),
+            len: 0,
+        }
+    }
 
     let encoding = if options.with_offsets_char_mode {
         tokenizer
-            .encode_char_offsets(message, options.add_special_tokens)
+            .encode_char_offsets(message.unwrap(), options.add_special_tokens)
             .expect("failed to encode input")
     } else {
         tokenizer
-            .encode(message, options.add_special_tokens)
+            .encode(message.unwrap(), options.add_special_tokens)
             .expect("failed to encode input")
     };
 
@@ -268,8 +281,10 @@ pub unsafe extern "C" fn decode(
     let string = tokenizer
         .decode(ids_slice, skip_special_tokens)
         .expect("failed to decode input");
-    let c_string = std::ffi::CString::new(string).unwrap();
-    c_string.into_raw()
+    match std::ffi::CString::new(string) {
+        Ok(c_string) => c_string.into_raw(),
+        Err(_) => null_mut()
+    }
 }
 
 /// # Safety
@@ -295,7 +310,9 @@ pub unsafe extern "C" fn free_tokenizer(ptr: *mut libc::c_void) {
     if ptr.is_null() {
         return;
     }
-    ptr.cast::<Tokenizer>();
+    unsafe {
+        drop(Box::from_raw(ptr.cast::<Tokenizer>()))
+    }
 }
 
 /// # Safety
