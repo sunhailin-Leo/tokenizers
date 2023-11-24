@@ -193,7 +193,7 @@ pub unsafe extern "C" fn encode(
             tokens: null_mut(),
             offsets: null_mut(),
             len: 0,
-        }
+        };
     }
 
     let encoding = if options.with_offsets_char_mode {
@@ -283,7 +283,7 @@ pub unsafe extern "C" fn decode(
         .expect("failed to decode input");
     match std::ffi::CString::new(string) {
         Ok(c_string) => c_string.into_raw(),
-        Err(_) => null_mut()
+        Err(_) => null_mut(),
     }
 }
 
@@ -310,9 +310,7 @@ pub unsafe extern "C" fn free_tokenizer(ptr: *mut libc::c_void) {
     if ptr.is_null() {
         return;
     }
-    unsafe {
-        drop(Box::from_raw(ptr.cast::<Tokenizer>()))
-    }
+    unsafe { drop(Box::from_raw(ptr.cast::<Tokenizer>())) }
 }
 
 /// # Safety
